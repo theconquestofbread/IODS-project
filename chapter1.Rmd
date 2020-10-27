@@ -1,13 +1,21 @@
 
 # About the project
 
-*Write a short description about the course and add a link to your GitHub repository here. This is an R Markdown (.Rmd) file so you should use R Markdown syntax.*
+The following documents my progress in the course **Introduction to Open Data Science**. The course includes basic *R*, *RStudio*, *RMarkdown* and *GitHub* usage, as well as several more advanced topics. I am saving all the weekly assignments and the course diary in a **GitHub repository** available [here](https://github.com/theconquestofbread/IODS-project).
 
-```{r}
+# Weekly Assignments
+## Week 1
+
+```{r, echo=F}
 # This is a so-called "R chunk" where you can write R code.
 
 date()
 
 ```
-The text continues here.
+I have some skills in statistical methods and the use of R but I am unfamiliar with GitHub (except as a place for plundering code). I have done most of work with longitudinal register data and with parametric methods, and, based on the course description, I hope that the course would provide me new knowledge on:
 
+* Open Data repositories
+* Survey methods
+* New methods (e.g. Cluster analysis).
+
+But that's probably enough for now, more to follow during next weeks.
