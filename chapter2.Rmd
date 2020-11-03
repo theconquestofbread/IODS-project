@@ -1,13 +1,111 @@
 ## Week 2
 
-*Describe the work you have done this week and summarize your learning.*
+### Introduction
+In this weeks' assignment I am looking into the association between students' learning approaches and their learning outcomes. The assignment is based on data collected during a Statistics course. The data consist of a question pattern that includes 32 items measuring three different dimensions of learning. In addition, there are information available on participants' global attitude towards statistics, gender, age and course exam points. More information on the data can be found [here](https://www.mv.helsinki.fi/home/kvehkala/JYTmooc/JYTOPKYS3-meta.txt).The data I am using in this assignment is a modified version of the original data (see below).
 
-- Describe your work and results clearly. 
-- Assume the reader has an introductory course level understanding of writing and reading R code as well as statistical methods.
-- Assume the reader has no previous knowledge of your data or the more advanced methods you are using.
+```{r,warning=F,message=F,results='hide'}
+#Load packages
+library(tidyverse)
+library(GGally)
 
-```{r}
-date()
+
+#Read in the data
+setwd("~/IODS-project/data")
+learning_2014 <- read.table("learning_2014.txt")
+
 ```
 
-Here we go again...
+### Data
+
+```{r}
+str(learning_2014)
+head(learning_2014)
+summary(learning_2014)
+```
+
+The modified data used in this assignment contains 7 variables and 166 students. Participants' age (17-55 years, mean 25.5 years), gender (male/female) and study exam score (7-33 points, mean score 22.7) are recorded in the corresponding variables. Variables _deep_, _stra_ and _surf_ measure the dimensions of learning approches and study skills: deep, strategic and surface learning. I have transformed these variables from the original question pattern by taking the mean of all the questions measuring a specific dimension. The possible values of the variables range between 1 and 5. The variable _attitude_ measures student's global attitude towards statistics. This is a sum variable consisting of 10 items, which I have scaled back to the original scale of the questions by taking the mean of these items (scale 1-5).  
+
+### Exploratory analysis with data visualization 
+
+Let's have a look at the data with the function _ggpairs_:
+
+
+```{r, warning=F,message=F,fig.cap='Figure 1: Graphical overview of the Learning 2014 data'}
+#Lower adds the regression lines
+#Upper scales the text in correlation
+#boxes
+ggpairs(learning_2014,
+        aes(
+          col=gender,alpha=0.5),
+        lower = list(continuous =
+                       wrap("smooth")),
+        upper = list(continuous =
+                       wrap("cor", size =
+                              2)))
+
+```
+
+
+Figure 1 summarizes the data. On the diagonal of the matrix of plots, there are density plots for continous variables and bar plots for discrete gender. The diagonal thus shows the distribution of each variable. In the upper triangle, there is a correlation matrix for the continuous variables and a boxplot for each variable by gender. The lower triangle contains scatter plots for continuous variables and histograms of these variables by gender.
+
+There are more females in the data, and they are slightly younger than males.There are indications of slight gender differences, especially in the attitude and surface learning variables (see the density plots & boxplots). However, since I am mostly interested in the association between learning approaches and outcomes (exam score), I will discard gender and differences to make the plot more readable (Figure 2). 
+
+```{r, warning=F,message=F,fig.cap='Figure 2: Graphical overview of the Learning 2014 data'}
+ggpairs(learning_2014 %>%
+          select(c("attitude",
+                   "surf",
+                   "deep",
+                   "stra",
+                   "points")),
+        lower = list(continuous =
+                       wrap("smooth")),
+        upper = list(continuous =
+                       wrap("cor", size =
+                              2)))
+```
+
+
+Figure 2 indicates that the strongest predictor of student's exam score is student's attitude towards statistics. The association is linear and positive: the higher the attitude, the higher the exam score. Of the learning approaches, strategic dimension seems to be positively and surface learning negatively associated with exam score. Based on correlation coefficients, both of these associations are relatively weak. Deep learning seems not to be correlated with exam score.Deep learning seems also to be distributed less evenly as the other dimensions: less students have low scores on this dimension.
+
+### Regression analysis
+
+Based on the investigation above, I assume that the exam score is associated with attitude, strategic and surface learning. I will examine this association by fitting a linear regression model:
+
+```{r}
+model1 <-
+  lm(points ~ 
+       attitude + stra + surf,
+     data=learning_2014)
+summary(model1)
+
+```
+
+The model output confirms the reasoning based on the plots above. Attitude has a positive association with exam score, as does higher score in strategic learning. High score on surface learning decreases exam score. The multiple R-squared suggests that 21% of the variation in exam score is explained by these three variables. However, neither strategic nor surface learning are statistically significantly different from 0 on the conventional confidence level 95%, i.e. the p-value of the test that the coefficient equals 0 is larger than 0.05.Thus, I exclude these variables and my final model includes only attitude as an explanatory variable.
+
+```{r}
+model2 <-
+  lm(points ~ 
+       attitude,
+     data=learning_2014)
+summary(model2)
+
+```
+
+Based on the summary of the model, attitude is statistically significantly associated with exam score. On average, a 1 point increase in attitude increases the exam score by around 3 points.The intercept estimates the points an individual with 0 score on attitude would have (around 12 points). Multiple R-squared shows that 19% of variation in exam score is explained by differences inthe global attitude towards statistics.
+
+Figure 3 shows the basic scatter plot of exam scores and attitude, and the fitted regression lines in upper left corner. In the other panels, I have plotted the basic diagnostic plots Residuals vs. Fitted values (upper right), Normal QQ-plot (lower left) and Residuals vs. Leverage (lower right).
+
+```{r,fig.cap='Figure 3: Diagnostic plots'}
+par(mfrow=c(2,2))
+plot(y=learning_2014$points,
+     x=learning_2014$attitude)
+abline(lm(points~attitude,data=learning_2014))
+plot(model1,which=c(1,2,5))
+
+```
+
+The basic assumption of a linear regression model is that the relationship between the variables is linear. From the scatter plot, this assumption seems to hold, although there are some somewhat outlying observations with low test scores and high attitude score. The linarity assumpption is also (mostly) confirmed by the residuals vs. fitted values plot. If the linearity assumption would not hold, we would expect to see very large residuals. There seems to be several outliers in this case with high residuals.
+
+The second assumption of the model is homoscedasticity of residuals. This means that the variance of the residuals is equal regardless of the values of the explanatory variables. From the residuals vs. fitted values, this seems to be the case. There are no distinct patterns between the residuals and fitted values. Third assumption of the model is that the residuals have a normal distribution. According to the QQ-plot, this assumption seems to hold as the residuals seem to fit the theoretical (normal) distribution relatively well.
+
+The fourth assumption of the model is independence between observations. This can not be examined through diagnostic plots. We can assume that the attitudes and exam scores should be independent from each other for the most parts. There seems to be a small cluster of individuals with high attitude score and low exam score, which could be speculated to be a group of friends that like statistics but whose previous night was a bit too long. This would be a violation of the independence observation. The residuals vs. leverage plot suggest that there are no observations that would have a major impact to the regression results. This is reassuring in terms of the model's sensitivity to these outliers. All in all, the model seems to be a relatively good one. Whether it is really useful is another thing. 
