@@ -1,0 +1,340 @@
+## Week 3
+
+### Introduction
+This weeks' assignment focuses on the risk factors of high alcohol use among secondary school students in Portugal. I am using data collected from two schools in Portugal [(Cortez and Silva 2008)](https://archive.ics.uci.edu/ml/datasets/Student+Performance). The data includes information on weekly alcohol use, grades in Mathematics and Portuguese, as well as data on several background variables, such as parental education. I will start the analysis by graphically exploring the dataset, then move on to using logistic regression to describe relevant associations, and finally assess the model validity by cross-validation exercises.
+
+```{r,warning=F,message=F,results='hide'}
+#Load packages
+library(tidyverse)
+library(GGally)
+library(patchwork)
+library(openxlsx)
+#Read in the data
+setwd("~/IODS-project/data")
+alc_use <- read.xlsx("alc_use.xlsx")
+
+```
+
+### Exploratory analysis
+
+I have modified the data by combining weekday and weekend alcohol use and constructed a binary variable indicating high alcohol use (average daily alcohol consumption > 2). Based on previous knowledge on the topic, I assume that males, students with less educated parents, students with problematic family relations and students going out a lot are likely to be at increased risk of high alcohol use. 
+
+First, let's look at parental education. Education is available for both parents, but I will use information on either parent with the highest education.
+
+```{r,message=F,warning=F,fig.cap='Means of high alcohol use by parental education. Size represents the number of observations'}
+#Generate variable paredu
+#=highest education of either parent
+
+alc_use$paredu <-
+  ifelse(alc_use$Fedu>alc_use$Medu,
+         alc_use$Fedu,alc_use$Medu)
+
+#Modify into factor
+alc_use$paredu <-
+  as.factor(alc_use$paredu)
+
+#Plot means of high use 
+#by parental education
+
+alc_use %>% 
+  group_by(paredu) %>%
+  summarise(mean_high_use=mean(high_use),
+            n=n())%>%
+  ggplot(aes(x=paredu,
+             y=mean_high_use,
+             size=n,
+             col=paredu)) +
+  geom_point() +
+  theme_minimal()
+
+prop.table(table(alc_use$paredu))
+prop.table(table(alc_use$paredu,alc_use$high_use),1)
+
+chisq.test(alc_use$paredu,alc_use$high_use)
+
+```
+
+
+From the figure we see that there are no clear pattern between parental education and high alcohol use. The highest proportion of high alcohol use is at level 3, and lowest at level 2. The Chi-squared test also indicates that there is no statistically significant relationship between these two variables. Moreover, low parental education is relatively uncommon among the students (10%).
+
+Second, I'll look at the relationship between the quality of family relations and high alcohol use.
+
+```{r,message=F,warning=F,fig.cap='Quality of family relations and high alcohol consumption.Violin plot'}
+
+
+alc_use %>%
+  ggplot(aes(x=high_use,
+             y=famrel)) +
+  geom_violin() +
+  geom_jitter() +
+  theme_minimal()
+
+prop.table(table(alc_use$famrel))
+
+```
+
+The violin plot indicates that the distribution of the quality of family relations is rather skewed towards the high values (good relations). In addition, not large differences seem to present between the high use and low use of alcohol.
+
+However, if we look at the distributions closer, it can be seen that around 80% of those without high alcohol consumption have rresponded that their family relations are very good or excellent (4 or 5). Among those with high consumption, there are slightly less these high values. Hence, I transform the variable into a binary one where 1=very good relations, 0=lower.
+
+```{r,message=F,warning=F,fig.cap='Quality of family relations and high alcohol consumption.Violin plot'}
+
+prop.table(table(alc_use$famrel,alc_use$high_use),2)
+
+alc_use$famrel_b <-
+  ifelse(alc_use$famrel>3,1,0)
+
+table(alc_use$famrel_b,alc_use$high_use)
+prop.table(table(alc_use$famrel_b,alc_use$high_use),1)
+chisq.test(alc_use$famrel_b,alc_use$high_us)
+
+```
+
+Within this binary indicator, there is a statistically significant (see Chi-squared test) relationship between lower quality family relations and alcohol use.The probability of high use among those with lower quality relations is around 15% higher.
+
+Finally, let's look at the last two explanatory variables, sex and going out with friends
+
+```{r,message=F,warning=F}
+
+
+ggplot(data=alc_use,
+  aes(x=high_use,y=goout))+
+  geom_violin()
+
+prop.table(table(alc_use$goout,alc_use$high_use),2)
+
+table(alc_use$sex,alc_use$high_use)
+
+prop.table(table(alc_use$sex,alc_use$high_use),1)
+chisq.test(alc_use$sex,alc_use$high_use)
+
+```
+Of these variables it is clear that going out has a positive association with high alcohol use, the distribution of going out is more pronounced towards the higher values (See the violin plot as well as the table of percentages). In addition, being a male increases the risk of high use: 40% of males and 20% of females are high alcohol users
+
+### Logistic regression
+
+My initial model consists of parental education, binary family relations indicator, continuous going out variable and sex of the student:
+
+```{r}
+
+model_1 <- 
+  glm(high_use ~ 
+        paredu + famrel_b + sex + goout,
+      data=alc_use)
+summary(model_1)
+
+```
+
+The summary of the model indicates that parental education decreases the odds of high alcohol use in any of the higher categories of education when compared to the lowest level of parental education. However, the differences are not statistically significant. Being a male and going out a lot increase the odds of high alcohol use, and having good relations with family decreases the odds. Based on this initial model, I will leave parental education out of my final model.
+
+
+```{r,message=F,warning=F}
+
+model_2 <- 
+  glm(high_use ~ 
+        famrel_b + sex + goout,
+      data=alc_use)
+
+OR <- exp(coef(model_2))
+CI <- exp(confint(model_2))
+
+cbind(OR,CI)
+
+```
+In my final model, one step increase in going out increases the odds of high alcohol use by 15% (OR=1.15, 95% CI: 1.11, 1.20). Being a male increases the odds of high alcohol use by 19% (OR=1.19, 95% CI: 1.09, 1.29) and having good family relations decrease the odds by 15% (OR=0.85, 95% CI: 0.77,0.94). Since the confidence intervals do not include 1, all these association are statistically significant at 95% confidence level.
+
+### Model predictions
+
+```{r}
+
+probs <- predict(model_2,
+                 type = "response")
+alc_use <- 
+  mutate(alc_use, probability = probs)
+
+alc_use <- 
+  mutate(alc_use,
+         predicted_high=probability>0.5)
+
+#table
+table(
+  high_use = alc_use$high_use,
+  prediction = alc_use$predicted_high)
+
+#Proportions
+table(
+  high_use = alc_use$high_use,
+  prediction = alc_use$predicted_high) %>%
+  prop.table() %>% addmargins()
+
+#Graphical assessment
+ggplot(alc_use, 
+       aes(x = probability,
+           y = high_use,
+           col=predicted_high)) +
+  geom_point(size=2)
+
+# loss function (mean prediction error)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+#average number of wrong predictions
+
+loss_func(class = alc_use$high_use,
+          prob = alc_use$probability)
+
+
+```
+
+The total, and average number, of inaccurately classified individuals is around 22%.The model estimates that only 11% would be high users whereas in the observed data, 30% were identified as high users. On the other hand, almost all of the high use predictions were true high users. Therefore, the estimates seem conservative, which is reassuring if any inference would be made. Erroneous TRUE predictions occured mostly for lower levels of predicted probabilities (see the Figure).
+
+I am not sure how to compare this to a simple guessing strategy but I guess(!) that this would mean that if I simply try to guess one person's alcohol consumption, there is a 50% chance I am wrong. Hence, I think the model is somewhat better than just guessing.
+
+### 10-fold cross-validation
+
+```{r}
+library(boot)
+
+cross_validation <-
+  cv.glm(data = alc_use, 
+         cost = loss_func, 
+         glmfit = model_2, K = 10)
+
+cross_validation$delta[1]
+
+```
+
+My model does seem to have better test performance when compaerd to the model in Datacamp: My average prediction error is around 23-24% (depends on the predictions) and in the Datacamp model it was 26%.
+
+Finally, I will try different including different sets of predictors and see what happens to the training and testing errors. I will start with a large model with 10 predictors, and move towards 1.
+
+```{r}
+
+m_1_formula <- 
+  as.formula('high_use~
+             sex + age +
+             famrel_b + goout +
+             paredu + health +
+             absences + romantic +
+             studytime + 
+             school')
+m_2_formula <- 
+  as.formula('high_use~
+             sex + age +
+             famrel_b + goout +
+             paredu + health +
+             absences + romantic +
+             school')
+m_3_formula <- 
+  as.formula('high_use~
+             sex + age +
+             famrel_b + goout +
+             paredu + health +
+             absences + 
+             school')
+m_4_formula <- 
+  as.formula('high_use~
+             sex + age +
+             famrel_b + goout +
+             paredu + health +
+             school')
+m_5_formula <- 
+  as.formula('high_use~
+             sex + age +
+             famrel_b + goout +
+             paredu + school')
+m_6_formula <- 
+  as.formula('high_use~
+             sex + age +
+             famrel_b + goout +
+             school')
+m_7_formula <- 
+  as.formula('high_use~
+             sex + age +
+             famrel_b + goout')
+m_8_formula <- 
+  as.formula('high_use~
+             sex + age +
+             famrel_b')
+m_9_formula <- 
+  as.formula('high_use~
+             sex + age')
+m_10_formula <- 
+  as.formula('high_use~
+             sex')
+library(purrr)
+#is_formula(m_10_formula)
+
+model_vector <- c(
+  m_1_formula,
+  m_2_formula,
+  m_3_formula,
+  m_4_formula,
+  m_5_formula,
+  m_6_formula,
+  m_7_formula,
+  m_8_formula,
+  m_9_formula,
+  m_10_formula)
+
+#is_formula(model_vector[[1]])
+
+error_mat <- matrix(NA,nrow=3,ncol=10)
+
+for(i in 1:10){
+  alc_temp <- alc_use
+  current_model <- model_vector[[i]]
+  
+  current_glm <- glm(current_model,
+                     family='binomial',
+                     data=alc_temp)
+  
+  probs <- predict(current_glm,
+                 type = "response")
+alc_temp <- 
+  mutate(alc_temp, probability = probs)
+
+alc_temp <- 
+  mutate(alc_temp,
+         predicted_high=probability>0.5)
+
+#average number of wrong predictions
+error_mat[1,i] <- 
+  loss_func(class = alc_temp$high_use,
+          prob = alc_temp$probability)
+
+cross_validation <-
+  cv.glm(data = alc_temp, 
+         cost = loss_func, 
+         glmfit = current_glm, K = 10)
+
+error_mat[2,i] <-
+  cross_validation$delta[1]
+
+}
+
+labels <- c("10","9","8","7","6",
+     "5","4","3","2","1")
+
+plot(error_mat[1,],type='l',
+     col='blue',lwd=2,xaxt='n',
+     xlab="Number of predictors",
+     ylab="Size of error")
+lines(error_mat[2,],col='orange',
+      lwd=2)
+axis(side=1,labels=labels,at=1:10)
+legend(1,y=0.3,legend=c("Training error",
+                "Testing error"),
+       col=c('blue','orange'),
+       lty=c(1,1))
+
+
+```
+
+Based on these investigations, it seems that when the number of predictor increase, bot the training and testing error get smaller. Training error, or the average number of wrong predictions, seems to be smaller than the testing error from the 10-fold cross-validation exercises. When the number of predictors gets smaller (below 4), both the testing and training errors increase and get closer together.
+
+
+
+Data reference: P. Cortez and A. Silva. Using Data Mining to Predict Secondary School Student Performance. In A. Brito and J. Teixeira Eds., Proceedings of 5th FUture BUsiness TEChnology Conference (FUBUTEC 2008) pp. 5-12, Porto, Portugal, April, 2008, EUROSIS, ISBN 978-9077381-39-7. https://archive.ics.uci.edu/ml/datasets/Student+Performance
