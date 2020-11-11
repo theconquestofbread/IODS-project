@@ -1,0 +1,242 @@
+## Week 4
+
+### Introduction
+
+Today's exercise exercise will focus on different techniques of clustering and classification. I will use data on housing in areas of Boston and mostly focus on the crime rate in the city. The data can be accessed through the R library [_MASS_](https://cran.r-project.org/web/packages/MASS/index.html). The data contains area-level information on the characteristics of homes (size, value etc.), the demographic composition of the area as well as several variables related to environmental and infrastructural factors. More information on the data is available [here](https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/Boston.html) and in the original study by [Harrison & Rubinfeld (1978)](https://www.sciencedirect.com/science/article/abs/pii/0095069678900062).
+
+BTW, I decided to hide my code chunks by default in this course diary as they make reading a bit tedious. You should be able to get the codes by clicking the Code-button next to results.
+
+### Overview of the dataset
+
+```{r,warning=F,message=F}
+library(MASS)
+library(tidyverse)
+library(GGally)
+library(corrplot)
+data(Boston)
+dim(Boston)
+str(Boston)
+summary(Boston)
+
+hist(Boston$crim)
+
+```
+
+The data includes 14 variables from some 500 regions in Boston. All of them are numeric.My main varibale of interest, crime rate, seems highly skewed, with most of the areas having low rates of crime and a have expressing higher rates.
+
+```{r,fig.cap='Correlation plot'}
+
+p.values.mat <-cor.mtest(Boston,
+                         conf.level = .95)
+cor.mat <- cor(Boston)
+corrplot.mixed(cor.mat,
+         lower.col='black',
+               upper='color',
+               tl.col='black',
+               tl.cex=0.5,
+               number.cex=0.5,
+               p.mat=p.values.mat$p,
+               sig.level=0.05)
+```
+
+For a graphical overview of data, I am using the correlation plot to make the plot to some extent readable (as compared to _pairs_ or _ggpairs_. In the plot, I have crossed out all the correlations not significant at 95% confidence level. Accordingly, it seems that the variable chas is not significantly correlated with most of the variables (probably as it is binary). Most of the other variables are, and there seems to be relatively strong correlations, for instance rad tax 0.91, age and dis -0.75, nox indus 0.76. Most of the correlations seem moderate, between 0.3 and 0.6.Rad and tax for crime rate.
+
+### Linear Discriminant analysis
+
+```{r}
+#Scale boston data
+
+boston_scaled <- as.data.frame(scale(Boston))
+summary(boston_scaled)
+```
+
+Tähän sössöä
+
+```{r}
+#Save categories of crime rate
+bins <- quantile(boston_scaled$crim)
+#Create new crime variable
+crime <- cut(boston_scaled$crim,
+             breaks=bins,
+             include.lowest=T,
+             label=c(
+               "low",
+               "med_low",
+               "med_high",
+               "high"))
+boston_scaled$crim <- NULL
+boston_scaled$crime <- crime
+#Divide data into test and training sets
+n <- nrow(boston_scaled)
+#Randomly sample 80% of the original rows
+#These are used for training
+ind <- sample(n, size=n*0.8)
+
+#Train set
+train <- boston_scaled[ind,]
+#Test set
+test <- boston_scaled[-ind,]
+
+#Correct classes in the test set
+correct <- test$crime
+
+#Drop crime from test
+test <- dplyr::select(test, -crime)
+
+```
+
+```{r}
+#LDA model
+lda.fit <- 
+  lda(crime~., data=train)
+
+lda.fit
+
+
+# the function for lda biplot arrows
+#(Stolen from Datacamp)
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric
+classes <- as.numeric(train$crime)
+
+# plot the lda results
+plot(lda.fit, dimen = 2,
+     col=classes,
+     pch=classes)
+lda.arrows(lda.fit, myscale = 2)
+
+
+# predict classes with test data
+lda.pred <- predict(lda.fit,
+                    newdata = test)
+
+# cross tabulate the results
+table(correct = correct, 
+      predicted = lda.pred$class)
+
+table(correct = correct, 
+      predicted = lda.pred$class) %>%
+  prop.table(2) %>% round(digits=2)
+
+
+```
+
+### K-means clustering
+
+```{r}
+#Reload boston
+data(Boston)
+boston_scaled <-
+  as.data.frame(scale(Boston))
+
+#Calculate distances between observations
+#I use Euclidean for no specific reason
+#except that the km algorithm uses it
+#by default
+
+distances <- dist(boston_scaled)
+summary(distances)
+
+#Identify correct number of clusters
+#Use the WCSS for this purpose
+
+k_max <- 15 #Arbitrary number
+
+twcss <-
+  sapply(1:k_max,
+         function(k){
+           kmeans(
+             boston_scaled,k)$tot.withinss})
+plot(x=1:k_max,y=twcss,type='l')
+
+#2 seems appropriate
+#Run k-means algorithm
+
+km <- kmeans(boston_scaled,centers=2)
+
+#Plot the data set in three parts
+pairs(boston_scaled[
+  c(1,5,6,7,8,12,13,14)], 
+        col=km$cluster)
+
+```
+
+### K-means + LDA
+
+```{r}
+
+km2 <- kmeans(boston_scaled,centers=3)
+boston_scaled$km_clust <- km2$cluster
+
+#LDA model (rename to avoid confusion
+#in the next step)
+lda.fit2 <- 
+  lda(km_clust~., data=boston_scaled)
+
+lda.fit2
+
+classes <- 
+  as.numeric(boston_scaled$km_clust)
+
+# plot the lda results
+plot(lda.fit2, dimen = 2,
+     col=classes,
+     pch=classes)
+lda.arrows(lda.fit2, myscale = 2)
+
+
+```
+```{r,warning=F,message=F}
+model_predictors <- 
+  dplyr::select(train, -crime)
+
+# check the dimensions
+dim(model_predictors)
+dim(lda.fit$scaling)
+
+# matrix multiplication
+matrix_product <- 
+  as.matrix(model_predictors) %*% lda.fit$scaling
+
+matrix_product <- as.data.frame(matrix_product)
+
+library(plotly)
+
+plot_ly(x = matrix_product$LD1,
+        y = matrix_product$LD2,
+        z = matrix_product$LD3,
+        type= 'scatter3d',
+        mode='markers',
+        color=train$crime)
+
+#let's fit still another k-means
+#For some reason, the code does not work
+#with the original train data
+#However, this just loads the boston
+#and limirts the same areas so no 
+#errors here, I guess
+
+data(Boston)
+boston_scaled <- as.data.frame(scale(Boston))
+train <- boston_scaled[ind,]
+km3 <- kmeans(train, centers=2)
+
+plot_ly(x = matrix_product$LD1,
+        y = matrix_product$LD2,
+        z = matrix_product$LD3,
+        type= 'scatter3d',
+        mode='markers',
+        color=km3$cluster)
+
+```
+
+### References
+Harrison, D. & Rubinfeld, D.L. Hedonic housing prices and the demand for clean air. 1978. Journal of Environmental Economics and Management 5(1), 81-102.
