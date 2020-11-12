@@ -1,0 +1,318 @@
+## Week 6
+
+### Introduction
+
+In this exercise, I am repeating the analyses from the chapters 8 and 9 of the book Multivariate Analysis for the Behavioral Sciences (Vehkalahti & Everitt 2019). In chapter 8, longitudinal analysis on scores of brief psychiatric rating scale among 40 males is conducted. Chapter 9 of the book focuses on the time evolution of weights of rats. Instead of replicating the same analysis with the same data, I will conduct the analyses in chapter 8 with the data on rats from chapter 9 and vice versa.
+
+### Longitudinal analysis of rat growth
+
+First, let's have a quick look at the data on the weight of rats:
+
+```{r}
+setwd("~/IODS-project/data")
+library(openxlsx)
+library(knitr)
+library(tidyverse)
+library(kableExtra)
+
+rats <- read.xlsx("rats.xlsx")
+
+#Transform vars
+rats$id <- as.factor(rats$id)
+rats$group <- as.factor(rats$group)
+rats$time <- as.integer(rats$time)
+
+#First 10 rows
+kable(head(rats,n=10)) %>%
+  kable_styling(full_width=F)
+
+str(rats)
+
+table(rats$id)
+table(rats$group)
+table(rats$time)
+
+```
+
+Selitä jutut
+
+```{r}
+
+labels <- c("1"="Group 1",
+            "2"="Group 2",
+            "3"= "Group 3")
+
+
+rats %>%
+  ggplot(aes(x=time,
+             y=weight)) +
+  facet_wrap(~group,
+             labeller=labeller(
+               group=labels)) +
+  geom_line(size=1,aes(col=id)) +
+  scale_colour_viridis_d(option='inferno') +
+  theme_minimal() +
+  theme(legend.position='none') 
+  
+
+```
+
+Tracking: standardize values
+
+```{r}
+
+rats <- 
+  rats %>%
+  group_by(time) %>%
+  mutate(mean_weight=mean(weight),
+         sd_weight=sd(weight)) %>%
+  mutate(std_weight=
+           (weight-mean_weight)/
+           sd(weight)) %>%
+  ungroup()
+
+rats %>%
+  ggplot(aes(x=time,
+             y=std_weight)) +
+  facet_wrap(~group,
+             labeller=labeller(
+               group=labels)) +
+  geom_line(size=1,aes(col=id)) +
+  scale_colour_viridis_d(option='inferno') +
+  theme_minimal() +
+  theme(legend.position='none') 
+  
+
+```
+
+mean profiles
+
+```{r}
+
+rats_s <-
+  rats %>%
+  group_by(group,time) %>%
+  mutate(mean=mean(weight),
+         sd=sd(weight),
+         n=n()) %>%
+  mutate(error=
+           qt(0.975,df=n-1)*sd/sqrt(n)) %>%
+  mutate(lower=mean-error,upper=mean+error)
+  
+rats_s %>%
+  ggplot(aes(x=time,
+             y=mean,
+             col=group)) +
+  geom_ribbon(aes(
+    ymax=upper,
+    ymin=lower,
+    fill=group),
+    alpha=0.3) +
+  geom_line(size=1) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() + 
+  theme_minimal() +
+  theme(legend.position='bottom') 
+
+```
+```{r}
+
+rats %>%
+  ggplot(aes(x=as.factor(time),
+             y=weight,
+             col=group)) +
+  geom_boxplot() +
+  #geom_jitter() +
+  scale_fill_viridis_d() + 
+  scale_colour_viridis_d() +
+  theme_minimal() +
+  theme(legend.position='bottom') 
+
+```
+Summary measure approach
+
+```{r}
+rats_s_2 <-
+  rats %>%
+  filter(time>1) %>%
+  group_by(group,id) %>%
+  mutate(mean=mean(weight)) %>%
+  ungroup()
+
+#filter leaves only one obs into the data
+rats_s_2 %>% filter(time==8) %>%
+  ggplot(aes(x=group,y=mean)) +
+  geom_boxplot() +
+  stat_summary(fun.y = "mean", 
+               geom = "point",
+               shape=23, size=4,
+               fill = "white") +
+  scale_y_continuous(
+    name = 'mean weight during follow-up')
+
+rats_s_2 %>% 
+  filter(time==8) %>%
+  select(c('id','group','mean')) %>%
+  kable() %>% kable_styling(full_width=F)
+
+```
+
+Three outliers
+
+```{r, warning=F}
+rats_s_2 %>% filter(id!=2) %>% #group 1
+  filter(id!=12) %>% #group 2
+  filter(id!=13) %>%
+  filter(time==8) %>% #leave only one obs
+  ggplot(aes(x=group,y=mean)) +
+  geom_boxplot() +
+  stat_summary(fun.y = "mean", 
+               geom = "point",
+               shape=23, size=4,
+               fill = "white") +
+  scale_y_continuous(
+    name = 'mean weight during follow-up')
+
+#Check the previous plot without these outliers
+
+rats_s_t <-
+  rats %>%
+  filter(id!=2) %>% #group 1
+  filter(id!=12) %>% #group 2
+  filter(id!=13) %>% #group 3
+  group_by(group,time) %>%
+  mutate(mean=mean(weight),
+         sd=sd(weight),
+         n=n()) %>%
+  mutate(error=
+           qt(0.975,df=n-1)*sd/sqrt(n)) %>%
+  mutate(lower=mean-error,upper=mean+error)
+  
+  
+rats_s_t %>%
+  ggplot(aes(x=time,
+             y=mean,
+             col=group)) +
+  geom_ribbon(aes(
+    ymax=upper,
+    ymin=lower,
+    fill=group),
+    alpha=0.3) +
+  geom_line(size=1) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() + 
+  theme_minimal() +
+  theme(legend.position='bottom') 
+
+
+```
+
+```{r}
+rats_no_out <- 
+  rats_s_2 %>% filter(id!=2) %>% #group 1
+  filter(id!=12) %>% #group 2
+  filter(id!=13) %>% 
+  filter(time==8) #leave only one row
+
+anova(lm(mean~group, data=rats_no_out))
+
+#baseline weight
+baselines <- 
+  rats %>% filter(time==1) %>%
+  select(c('id','weight')) %>%
+  rename(baseline=weight)
+
+rats_no_out_2 <-
+  inner_join(rats_no_out,baselines,by='id')
+
+anova(lm(mean~group + baseline,
+         data=rats_no_out_2))
+
+summary(lm(mean~group + baseline,
+         data=rats_no_out_2))
+
+```
+
+### Linear mixed effects model
+
+the above analysis is boring
+
+```{r}
+#read data
+setwd("~/IODS-project/data")
+bprs <- read.xlsx("bprs.xlsx")
+head(bprs)
+#Transform vars
+
+bprs$treatment <- as.factor(bprs$treatment)
+bprs$week <- as.integer(bprs$week)
+
+#First 10 rows
+kable(head(bprs),n=10) %>%
+  kable_styling(full_width=F)
+
+summary(bprs)
+
+#make a backup id
+
+bprs$subject <- as.integer(bprs$subject)
+
+bprs$id2 <- 
+  ifelse(bprs$treatment==1,
+         bprs$subject,bprs$subject+20)
+
+#table(bprs$id2,bprs$subject)
+
+bprs$subject <- as.factor(bprs$subject)
+
+library(wesanderson)
+mypal <- wes_palette('Royal1')
+
+bprs %>%
+  ggplot(aes(x=week,
+             y=bprs,
+             group=id2,
+             col=treatment)) +
+  geom_line(size=1) +
+  scale_colour_manual(values=mypal) +
+  theme_minimal()
+
+```
+
+```{r}
+#standard OLS model
+mod1 <- lm(
+  bprs~treatment + week,
+  data=bprs)
+
+summary(mod1)
+```
+
+```{r}
+library(lme4)
+
+# a random intercept model
+modref <- lmer(
+  bprs ~ treatment + week + (1 | id2),
+  data = bprs, REML = FALSE)
+
+summary(modref)
+
+
+```
+
+```{r}
+library(lme4)
+
+# a random intercept and 
+#random slope model
+modref2 <- lmer(
+  bprs ~ treatment + week + (week | id2),
+  data = bprs, REML = FALSE)
+
+summary(modref2)
+
+anova(modref,moderef2)
+
+
+```

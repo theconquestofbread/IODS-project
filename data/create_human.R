@@ -16,7 +16,7 @@
 
 library(tidyverse)
 library(openxlsx)
-setwd("~IODS-project/data")
+setwd("~/IODS-project/data")
 
 
 hd <- 

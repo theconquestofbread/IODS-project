@@ -2,3 +2,109 @@
 
 ### Introduction
 
+ddd
+
+### Graphical overview
+
+```{r,message=F,warning=F}
+library(openxlsx)
+setwd("~/IODS-project/data/")
+human <- read.xlsx("human.xlsx")
+
+library(GGally)
+library(tidyverse)
+library(corrplot)
+summary(human)
+
+ggpairs(human,
+        upper = list(continuous =
+                       wrap("cor", size =
+                              3)))
+corrplot(cor(human))
+
+```
+
+### Principal component analysis
+jkjkjk
+
+```{r,warning=F,message=F}
+
+#PCA
+pca_human <- prcomp(human)
+#summary
+summary(pca_human)
+#Save proportions of variance explained
+proportions <-
+  round(
+    summary(pca_human)$importance[2,]*100,
+    digits=3)
+
+pc_lab <- 
+  paste0(
+  names(proportions)," (", proportions, "%)")
+#biplot
+biplot(pca_human, 
+       choices=1:2,
+       cex=c(0.5,0.4),
+       xlab=pc_lab[1],
+       ylab=pc_lab[2])
+
+
+```
+
+```{r}
+#scale data
+human_sc <- scale(human)
+
+pca_human_sc <- prcomp(human_sc)
+
+summary(pca_human_sc)
+
+proportions <-
+  round(
+    summary(pca_human_sc)$importance[2,]*100,
+    digits=3)
+
+pc_lab <- 
+  paste0(
+  names(proportions)," (", proportions, "%)")
+
+biplot(pca_human_sc, 
+       choices=1:2,
+       cex=c(0.5,0.4),
+       xlab=pc_lab[1],
+       ylab=pc_lab[2])
+
+```
+
+
+```{r,warning=F,message=F}
+library(FactoMineR)
+data(tea)
+
+tea_plc_time <-
+  tea[,1:6]
+
+mca <- MCA(tea_plc_time,graph=F)
+summary(mca)
+plot(mca,habillage="quali",invisible=c("ind"))
+
+```
+
+```{r,warning=F,message=F}
+
+data(tea)
+
+gather(tea[,1:6]) %>% 
+  ggplot(aes(value)) + 
+  facet_wrap("key",scales="free") + 
+  geom_bar()
+
+tea_plc_time_w_d <-
+  tea[,1:3]
+
+mca <- MCA(tea_plc_time_w_d,graph=F)
+summary(mca)
+plot(mca)
+
+```
