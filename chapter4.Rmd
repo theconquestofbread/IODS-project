@@ -2,9 +2,9 @@
 
 ### Introduction
 
-Today's exercise exercise will focus on different techniques of clustering and classification. I will use data on housing in areas of Boston and mostly focus on the crime rate in the city. The data can be accessed through the R library [_MASS_](https://cran.r-project.org/web/packages/MASS/index.html). The data contains area-level information on the characteristics of homes (size, value etc.), the demographic composition of the area as well as several variables related to environmental and infrastructural factors. More information on the data is available [here](https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/Boston.html) and in the original study by [Harrison & Rubinfeld (1978)](https://www.sciencedirect.com/science/article/abs/pii/0095069678900062).
+Today's exercise exercise will focus on different techniques of clustering and classification. I will use data on housing in areas of Boston and mostly focus on the crime rate in the city. The data can be accessed through the R package [_MASS_](https://cran.r-project.org/web/packages/MASS/index.html). The data contains area-level information on the characteristics of homes (size, value etc.), the demographic composition of the area as well as several variables related to environmental and infrastructural factors. More information on the data is available [here](https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/Boston.html) and in the original study by [Harrison & Rubinfeld (1978)](https://www.sciencedirect.com/science/article/abs/pii/0095069678900062).
 
-BTW, I decided to hide my code chunks by default in this course diary as they make reading a bit tedious. You should be able to get the codes by clicking the Code-button next to results.
+BTW, I decided to hide my code chunks by default in this course diary as they make reading a bit tedious. You should be able to get the codes by clicking the Code button next to results.
 
 ### Overview of the dataset
 
@@ -22,7 +22,7 @@ hist(Boston$crim)
 
 ```
 
-The data includes 14 variables from some 500 regions in Boston. All of them are numeric.My main varibale of interest, crime rate, seems highly skewed, with most of the areas having low rates of crime and a have expressing higher rates.
+The data includes 14 variables from some 500 regions in Boston. All of them are numeric.My main varibale of interest, crime rate, seems highly skewed, with most of the areas having low rates of crime and a few expressing higher rates.
 
 ```{r,fig.cap='Correlation plot'}
 
@@ -39,18 +39,22 @@ corrplot.mixed(cor.mat,
                sig.level=0.05)
 ```
 
-For a graphical overview of data, I am using the correlation plot to make the plot to some extent readable (as compared to _pairs_ or _ggpairs_. In the plot, I have crossed out all the correlations not significant at 95% confidence level. Accordingly, it seems that the variable chas is not significantly correlated with most of the variables (probably as it is binary). Most of the other variables are, and there seems to be relatively strong correlations, for instance rad tax 0.91, age and dis -0.75, nox indus 0.76. Most of the correlations seem moderate, between 0.3 and 0.6.Rad and tax for crime rate.
+For a graphical overview of data, I am using the correlation plot to make the plot to some extent readable (compared to _pairs_ or _ggpairs_). In the plot, I have crossed out all the correlations not significant at 95% confidence level. It seems that the variable chas is not significantly correlated with most of the variables (probably as it is binary). Anyhow, the variable indicates whether the area is bounded by river Charles, which makes little sense to me. 
+
+Most of the other variables are statistically correlated, and there seems to be relatively strong correlations, for instance property tax rate (tax) and access to highways (rad) have a correlation of 0.91, age (age) of houses and distance from city centre (dis) have a correlation of -0.75, and nitrous ocygen emissions and proportion of non-retail businesses (=industry) have a correlation of 0.76. These are rather intuitive. Most of the correlations seem moderate, between 0.3 and 0.6.The highest correlations between crime rate occur for variables access to radial highways and property tax rate.
 
 ### Linear Discriminant analysis
+
+As a next part of the assignment, I am running a Linear Discriminant Analysis (LDA). LDA allows for classifying observations to pre-known categories, based on linear associations between variables in the data.There are two assumptions in the model, the variables are normally distributed and has the same variance. Thus, the process starts by scaling the data.The effects of scaling can be seen on the following summary: all the variables are centered around their mean, which is now 0.
 
 ```{r}
 #Scale boston data
 
 boston_scaled <- as.data.frame(scale(Boston))
 summary(boston_scaled)
-```
 
-Tähän sössöä
+```
+Next, I will first calculate target classes for the LDA model. I am using the crime rate in the areas and dividing it into quartiles. Then, I divide the data into train and test sets by randomly sampling 80% of the areas (train). The rest of the areas are included in the test set.Lastly, I fit the LDA model on the training data and test the model by conducting predictions with the test set
 
 ```{r}
 #Save categories of crime rate
@@ -66,8 +70,10 @@ crime <- cut(boston_scaled$crim,
                "high"))
 boston_scaled$crim <- NULL
 boston_scaled$crime <- crime
+
 #Divide data into test and training sets
 n <- nrow(boston_scaled)
+
 #Randomly sample 80% of the original rows
 #These are used for training
 ind <- sample(n, size=n*0.8)
@@ -83,15 +89,9 @@ correct <- test$crime
 #Drop crime from test
 test <- dplyr::select(test, -crime)
 
-```
-
-```{r}
 #LDA model
 lda.fit <- 
   lda(crime~., data=train)
-
-lda.fit
-
 
 # the function for lda biplot arrows
 #(Stolen from Datacamp)
@@ -107,18 +107,26 @@ lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0
 # target classes as numeric
 classes <- as.numeric(train$crime)
 
+# predict classes with test data
+lda.pred <- predict(lda.fit,
+                    newdata = test)
+
+```
+
+Let's have a look at the results.
+
+```{r}
 # plot the lda results
 plot(lda.fit, dimen = 2,
      col=classes,
      pch=classes)
 lda.arrows(lda.fit, myscale = 2)
 
+#summary of the model
+lda.fit
 
-# predict classes with test data
-lda.pred <- predict(lda.fit,
-                    newdata = test)
-
-# cross tabulate the results
+# cross tabulate 
+#the correct classes vs. predictions
 table(correct = correct, 
       predicted = lda.pred$class)
 
@@ -129,10 +137,16 @@ table(correct = correct,
 
 ```
 
+The most relevant information is included in the scatterplot, aka biplot, of the first two linear discriminants. The plot shows that the grouping with these LDAs of high crime rate areas was relatively successful, whereas the other groups tend to have more overlap. The arrows in the plot show the importance of each variable, and to which direction the are working. It seems that the access to radiaal highways sparates relatively well the high crime rate group. The summary of the model shows the same: mean of rad is high in the high crime rate group, and lower in others.The rad variable has also a large coefficient from the LD1. These findings indicate that crime occurs in places where there are easy to access highways, or, rather, in places where people come and go (probably city centres and some sort of knots in the public transportation system).
+
+When we look at the predictions done with the test data, we see similarly as in the biplot that the model groups the high crime rate areas mostly correct but struggles more with the others. This is probably related to the skewness of the crime variable: the lowest three classes are relatively similar and the hig crime rate group is somewhat special case.
+
 ### K-means clustering
 
+Okay then, let's move on from classification to clustering. I will run a k-means algorithm to identify clusters in the Boston data. I start by calculating the Euclidean distances and showing a summary of these, for the reason that the k-means algorithm will use these distances. Second, I start running the k-means algorithm for different cluster numbers, ranging from 1 to 15, and calculate the Total Within Cluster Sum of Squares (TWCSS) after each iteration. Usually, the suitable number of clusters is where the TWCSS has the highest drop. 
+
 ```{r}
-#Reload boston
+#Reload and rescale boston
 data(Boston)
 boston_scaled <-
   as.data.frame(scale(Boston))
@@ -146,7 +160,7 @@ distances <- dist(boston_scaled)
 summary(distances)
 
 #Identify correct number of clusters
-#Use the WCSS for this purpose
+#Use the TWCSS for this purpose
 
 k_max <- 15 #Arbitrary number
 
@@ -158,18 +172,28 @@ twcss <-
 plot(x=1:k_max,y=twcss,type='l')
 
 #2 seems appropriate
+
+```
+
+According to the plot, two seems to be the correct number of clusters. I will select that and repeat the k-means algorithm with 2 clusters.
+
+```{r}
 #Run k-means algorithm
 
 km <- kmeans(boston_scaled,centers=2)
 
-#Plot the data set in three parts
+#Plot the data set
 pairs(boston_scaled[
   c(1,5,6,7,8,12,13,14)], 
         col=km$cluster)
 
 ```
 
+Above, I have selected some variables that seem to show reasonable patterning in the data. The scatter plots show the differences between the two clusters identified with the k-means. Indeed, the clusters appear more or less feasibly separated for each of the variables. 
+
 ### K-means + LDA
+
+Now, I will combine the k-means algorithm with the LDA. I first identify three target classeswith k-means to be used in LDA, and the fit the model.
 
 ```{r}
 
@@ -194,13 +218,17 @@ lda.arrows(lda.fit2, myscale = 2)
 
 
 ```
+
+As can be seen from the biplot, the three identified clusters work relatively nicely with the LDA. We can see three clusters separated relatively well by the variables. Most important separators seem to be access to highways, the age of the building stock and property tax rate. The tax rate operates to same direction with highways, indicating that there might be more expensive housing near good travelling options. Old houses seem to form their own cluster.
+
+### Plotly fun
+
+As the last part of the analysis, I am comparing the original LDA with the k-means with two clusters. The plots project data points based on the LDA, rather than actual observatioins. In the first plot, the colors represent the four original classes, and in the second, the two k-means clusters.
+
 ```{r,warning=F,message=F}
 model_predictors <- 
   dplyr::select(train, -crime)
 
-# check the dimensions
-dim(model_predictors)
-dim(lda.fit$scaling)
 
 # matrix multiplication
 matrix_product <- 
@@ -237,6 +265,9 @@ plot_ly(x = matrix_product$LD1,
         color=km3$cluster)
 
 ```
+
+We can see from the plots that the original crime rate reflects in the k-means clusters: Those with high or medium high crime rate form one cluster, and those with lower rates another. Using the k-means clusters as target classes is likely to produce a better model than the original solution with four target groups.
+
 
 ### References
 Harrison, D. & Rubinfeld, D.L. Hedonic housing prices and the demand for clean air. 1978. Journal of Environmental Economics and Management 5(1), 81-102.
