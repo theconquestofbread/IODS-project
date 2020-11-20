@@ -2,13 +2,13 @@
 
 ### Introduction
 
-In this exercise, I am repeating the analyses from the chapters 8 and 9 of the book Multivariate Analysis for the Behavioral Sciences (Vehkalahti & Everitt 2019). In chapter 8, longitudinal analysis on scores of brief psychiatric rating scale among 40 males is conducted. Chapter 9 of the book focuses on the time evolution of weights of rats. Instead of replicating the same analysis with the same data, I will conduct the analyses in chapter 8 with the data on rats from chapter 9 and vice versa.
+In this exercise, I am repeating the analyses from the chapters 8 and 9 of the book Multivariate Analysis for the Behavioral Sciences (Vehkalahti & Everitt 2019). In chapter 8, longitudinal analysis on the scores of a brief psychiatric rating scale among 40 males is conducted. Chapter 9 of the book focuses on the time evolution of weights of rats. Instead of replicating the same analysis with the same data, I will conduct the analyses in chapter 8 with the data on rats from chapter 9 and vice versa.
 
 ### Longitudinal analysis of rat growth
 
 First, let's have a quick look at the data on the weight of rats:
 
-```{r}
+```{r,warning=F,message=F}
 setwd("~/IODS-project/data")
 library(openxlsx)
 library(knitr)
@@ -34,7 +34,9 @@ table(rats$time)
 
 ```
 
-Selitä jutut
+Above, we can see that the data are in long format, so that each row of the data includes a time observation, grouped by the rat id. There are 16 rats and 11 time points (marked as days, I believe). Moreover, the rats are grouped into three separate groups, with 8 rats in the first and 4 rats in the second and third group.The groups are defined by rat diet.
+
+Let's see how the rat weights evolve in time, separately by group id:
 
 ```{r}
 
@@ -56,8 +58,7 @@ rats %>%
   
 
 ```
-
-Tracking: standardize values
+In the plot above, I have plotted all the individual trajectories of rat growth in time. An onbvious observation is that in Group 1, the rats are smaller than in other groups. In Group 2, there seems to be a giant rat among the others, which are more similar to Group 3. The rats are bigger in the end of follow-up, and the growth seems to be relatively steady for most of them.In general, the rats with high start weight are the biggest in the end of the follow-up, which is also known as "the tracking phenomenon". This phenomenon is somewhat more visible below, where I have standardized the weight of rats at each time point:
 
 ```{r}
 
@@ -85,7 +86,7 @@ rats %>%
 
 ```
 
-mean profiles
+These individual growth profiles are of little use for a researcher interested in statistical rat weights (complex systems scientists might disagree). A usual approach to combine information is some sort of averaging over groups of interest, in this case the diet groups. 
 
 ```{r}
 
@@ -115,8 +116,10 @@ rats_s %>%
   theme(legend.position='bottom') 
 
 ```
-```{r}
 
+In the plot above, I have averaged over the group-specific means by time point, and calculated 95% confidence intervals for these means. As can be seen from the figure, the rats in diet group 1 are clearly smaller than others. The confidence interval of the Group 2 is really wide, and absorps the Group 3. That seems to be related to the fact that there is this one huge rat. The outlier is also clearly visible below in the boxplot. We also see an outliers in the other groups.
+
+```{r}
 rats %>%
   ggplot(aes(x=as.factor(time),
              y=weight,
@@ -129,9 +132,10 @@ rats %>%
   theme(legend.position='bottom') 
 
 ```
-Summary measure approach
 
-```{r}
+Let's keep that in mind and continue to using a summary measure approach to longitudinal data. In this approach, I look at how much the rats the differ in their weight, depending on the on the diet group I do this by averaging over the rat weights in each group. I do not take into account the starting weight.Diverging from the Datacamp exercise, I also leave only one row for each rat as duplicating the same value 10 times seems odd to me (doesn't affect these results but will affect the SEs in the regressions below).
+
+```{r,warning=F,message=F}
 rats_s_2 <-
   rats %>%
   filter(time>1) %>%
@@ -157,7 +161,7 @@ rats_s_2 %>%
 
 ```
 
-Three outliers
+The boxplots of the average weights of all the rats by group reveal three outliers. The outliers seem to especially affect the group mean in groups 2 and 3 (these are the smallest groups so no wonder). I will continue the analyses by excludinng all the three outliers.
 
 ```{r, warning=F}
 rats_s_2 %>% filter(id!=2) %>% #group 1
@@ -207,6 +211,10 @@ rats_s_t %>%
 
 ```
 
+So, now we have much prettier picture with group members resembling each other. The largest average weights seem to occur in the diet group 3, and smallest in the diet group 1. These differences seem to hold across the follow-up.
+
+As the last part of the analysis, I look at the statistical significance of the group differences with and without baseline weight, implementing the ANOVA approach.
+
 ```{r}
 rats_no_out <- 
   rats_s_2 %>% filter(id!=2) %>% #group 1
@@ -233,15 +241,17 @@ summary(lm(mean~group + baseline,
 
 ```
 
+According to the ANOVA tables and a summary of regression model, the group difference in rat weight is statistically significant. Adding the baseline weight does not affect the results and the baseline weight is not statistically significantly associated with the average weight during follow-up. This leads me to conclude that the diet groups aer different to each other and that the diet impacts rat size (pretty obvious). But, I am a bit reluctant to make much out of it as I do not know the original data. It looks to me that the rats were put into diet groups based on their baseline weight, which would explain much of the stuff above (Group and baseline would be measuring pretty much the same).If the purpose of the study would be to study growth based on diet, all of the above woulsd rather flawed. 
+
 ### Linear mixed effects model
 
-the above analysis is boring
+The analysis above is a bit crude way to handle longitudinal data. Much of the information is lost when aggregating data by time and group.In the latter part of the assignment, I will conduct multilevel modelling, which is a bit more sophisticated way to handle repeated observations.I will use the Brief Psychiatric Rating Scale data presented in the textbook in chapter 8 but run the analysis in chapter 9 (Vehkalahti & Everitt 2019).
 
-```{r}
+```{r, warning=F, message=F}
 #read data
 setwd("~/IODS-project/data")
 bprs <- read.xlsx("bprs.xlsx")
-head(bprs)
+
 #Transform vars
 
 bprs$treatment <- as.factor(bprs$treatment)
@@ -261,9 +271,18 @@ bprs$id2 <-
   ifelse(bprs$treatment==1,
          bprs$subject,bprs$subject+20)
 
-#table(bprs$id2,bprs$subject)
+unique(bprs$id2)
+unique(bprs$week)
 
 bprs$subject <- as.factor(bprs$subject)
+
+
+```
+
+
+Okay, we can see above that there are 360 observations divided to two treatment groups. In total, there are 40 individuals and each has 9 measurements: baseline (0) and 8 follow-up measurements.Let's look at how these individuals look by the treatment group:
+
+```{r,warning=F,message=F}
 
 library(wesanderson)
 mypal <- wes_palette('Royal1')
@@ -279,6 +298,25 @@ bprs %>%
 
 ```
 
+That's quite a mess, let's try faceted plot:
+
+```{r}
+
+
+bprs %>%
+  ggplot(aes(x=week,
+             y=bprs,
+             group=id2,
+             col=treatment)) +
+  geom_line(size=1) +
+  scale_colour_manual(values=mypal) +
+  theme_minimal() +
+  facet_wrap(~treatment)
+
+```
+
+Well, these are not useful at al so I'll just move on to regression models.I will first start by violating the observations of the ordinary least squares linear regression model and fitting it to data with obviously not independent observations. I am interested whether time and the treatment received has an impact to the BPRS score (whether mental well-being improves or not). The model summary indicate that time decreases the BPRS score, which I believe indicate improvements in mwntal well-being. The treatment received seems notto have a statistically significant association with BPRS score 
+
 ```{r}
 #standard OLS model
 mod1 <- lm(
@@ -288,7 +326,9 @@ mod1 <- lm(
 summary(mod1)
 ```
 
-```{r}
+The model above seems okay but we know that it is obviously wrong because ofthe high autocorrelation in these type of outcomes. Let's try a better approach and fit a multilevel linear regression model, where we model an individual intercept for each individual (random intercept model).
+
+```{r, warning=F, message=F}
 library(lme4)
 
 # a random intercept model
@@ -301,9 +341,11 @@ summary(modref)
 
 ```
 
-```{r}
-library(lme4)
+The model output indicates that there is considerable between-individual variance, which was to be expected. Regarding the effects of treatment and time, the coefficients are identical to the OLS model but the standard errors differ: for treatment, the SE is higher in the random intercept model, and the SE of time is smaller.
 
+The random intercept model basically gives each individual their own base level of BPRS. Obviously, there can be differences by individual in the evolution of the outcome as well. To model this, we will need to give each individual their own slope: 
+
+```{r}
 # a random intercept and 
 #random slope model
 modref2 <- lmer(
@@ -312,7 +354,64 @@ modref2 <- lmer(
 
 summary(modref2)
 
-anova(modref,moderef2)
+anova(modref,modref2)
+```
 
+The model output is relatively similar to the random intercept model. The coefficient of treatment has lowered but the effect of time is still the same size. There is a small change in standard errors. We still found evidence of mental health improving with time but no impact of treatment. The ANOVA output indicates that the random intercept + random slope provides a better model fit to the random intercept model.The log-likelihood test is statistically significant and BIC and AIC smaller.
+
+We have now modelled the within-individual variation and found that only time seems to be related to improvements in the BPRS, whereas treatment doesn't produce betwee-individual differences. We will still need to see if the effects of treatment are dependent on time. For this purpose I'll modify the above model by adding an interaction term between time and treatment.
+
+```{r}
+# a random intercept and 
+#random slope model with interaction
+modref3 <- lmer(
+  bprs ~ treatment + week + treatment*week +
+    (week | id2),
+  data = bprs, REML = FALSE)
+
+summary(modref3)
+
+anova(modref2,modref3)
+```
+
+According to the outputs, this model is worse than the previous, so let's forget interactions and fall back to the random intercept + random slope model. How does this compare to the original data?
+
+```{r}
+library(patchwork)
+observed<-
+  bprs %>%
+  ggplot(aes(x=week,
+             y=bprs,
+             group=id2,
+             col=treatment)) +
+  geom_line(size=1) +
+  ggtitle("Observed values") +
+  scale_colour_manual(values=mypal) +
+  theme_minimal() +
+  theme(legend.position='bottom')
+
+bprs$fitted <- fitted(modref2)
+
+fitted<-
+  bprs %>%
+  ggplot(aes(x=week,
+             y=fitted,
+             group=id2,
+             col=treatment)) +
+  geom_line(size=1) +
+  scale_colour_manual(values=mypal) +
+  ggtitle('Fitted') +
+  scale_y_continuous(name="bprs") +
+  theme_minimal()+
+  theme(legend.position='bottom')
+
+observed+fitted +
+  plot_layout(guides='collect') &
+  theme(legend.position='bottom')
 
 ```
+
+The model seems to work relatively nicely. The random slopes and intercept are clearly visible in the Fitted panel above. To conclude, we see that the BPRS scale decreases with time but we do not identify any differences by the treatment received.
+
+And with that, I will conclude the assignment as well as the whole course. Have a nice wintertime!
+

@@ -2,7 +2,7 @@
 
 ### Introduction
 
-ddd
+The fifth week of the course focuses on different dimension reduction techniques. I will be using Principal Component Analysis (PCA) and Multiple Correspondence Analysis (MCA). For practicing these methods, I am doing a few tasks with the United Nations Development Programme data from Human Development Index (HDI) and Gender Inequality Index (GII) databases. The data covers countries across the globe. Metadata are available [here](http://hdr.undp.org/en/content/human-development-index-hdi). 
 
 ### Graphical overview
 
@@ -24,10 +24,15 @@ corrplot(cor(human))
 
 ```
 
-### Principal component analysis
-jkjkjk
+From the summary above, we can see that all the variables in the data are continuous. We have information on demographic characteristics, including life expectancy (_life_exp_), maternal mortality (_maternal_mx_) and teen birth rate (_teen_births_).Socioeconomic indicators related to gender equality include the ratio of female labour force rate to male labour force rate (_lab_ratio_) and the ratio of rate of secondary educated females to the rate of secondary educated males (_edu_ratio_). Lastly, we have information on the proportion of females in the parliament and the gross national income (GNI) and the expected number of years of education (_exp_edu_). The data are available for 195 countries.
 
-```{r,warning=F,message=F}
+We can start to identify associations between these variables from the _ggpairs_ output and the correlation plot above. First, we see that the demographic indicators, overall life expectancy, maternal mortality rate and teen birth rate are strongly correlated. These are also correlated with the GNI, the expected number of years of education and gender equality in education. Life expectancy is correlated positively with these indicators, whereas maternal mortality and teen births negatively.Gender equality in the labour force or in the parliament does not seem to have strong correlations with any of the variables. 
+
+### Principal component analysis
+
+Given that the data used describes multiple aspects of societies, identifying bivariate associations is somewhat uninteresting. Therefore, I will perform a PCA to identify whether the indicators presented above belong to same dimensions and if the dimensions have meaningful relationships between each other. I will start by running the analysis on unmodified data.
+
+```{r,warning=F,message=F,fig.cap='PCA with unstandardized data. GNI explains all of the variability'}
 
 #PCA
 pca_human <- prcomp(human)
@@ -52,7 +57,9 @@ biplot(pca_human,
 
 ```
 
-```{r}
+Okay then, from the summary of the model we see that the model identified 8 principle components (which is the number ofthe variables) but the first of these explains 99.99%=100% of the variation in the data. If we look at the biplot, we can see that the only important component seems to be the gross national income (I guess many politicians use this type of PCA in their reasonings). The fact that GNI overrides all the other variables is related to the fact that in th unmodified data, all the variables have different variances and the PCA treats the variable with the largest variance as the most important one. Therefore, to actually identify the real dimensions, I need to scale the data and run the analysis again.
+
+```{r,fig.cap='PCA with scaled data. First principal component measuring overall economic and vital well-being, second gender equality'}
 #scale data
 human_sc <- scale(human)
 
@@ -77,6 +84,14 @@ biplot(pca_human_sc,
 
 ```
 
+Now, a much more interesting  plot is produced. We can see that the sociodemographic indicators education, GNI, life expectancy, maternal mortality and teen births load to the first principal component. That component explains over 50% of the total variability in the data. We also see that maternal mortality and teen births operate to an opposite direction when compared to the other factors. These makes sense as it would be weird if for instance GNI would increase with increasing rates of maternal mortality and teen births. These correlations were already identified above in the graphical overview step.
+
+Second, the new PCA produced another distinct principal component, which seems to describe gender equality. The gender ratio at the labour market and proportion of females in parliament relate to this component. This dimension seems to be genuinely distinct from the first as the variables related to this component have almost 90 degree angle (meaning low correlation) in the arrows when compared to the indicators influencing dimension one.I might interpret this to indicate that gender equality in labour market and parliament is not related to economic and "vital" well-being in the society.Instead, other factors (maybe values, attitudes etc.) are at play. A surprising thing is that the gender equality in education seems not to belong to the gender equality component. However, this is probably because the variable only includes information on secondary education. It might be that for overall increases well-being, it is necessary to have a population where each member has at least some education. Differences might occur if tertiary education was used as the measure of education.
+
+
+### Multiple Correspondence Analysis
+
+As the second part of this assignment, I am implementing the MCA to a pre-existing dataset called [_tea_](https://rdrr.io/cran/FactoMineR/man/tea.html), available in R package _FactoMineR_. The data contains information of tea drinking habits of 300 individuals. I chose 6 first variables from the data set that measure the time when these people drink tea, and try to identify similar components and in the PCA but this time for categorical data.
 
 ```{r,warning=F,message=F}
 library(FactoMineR)
@@ -86,10 +101,12 @@ tea_plc_time <-
   tea[,1:6]
 
 mca <- MCA(tea_plc_time,graph=F)
-summary(mca)
+
 plot(mca,habillage="quali",invisible=c("ind"))
 
 ```
+
+The MCA calculates distances between variables in a three-dimensional space (I think, at least). In the plot above, the distances between the variables at first two-dimensions are plotted. We can see that the variable categories opposite to each other (no/yes) are plotted to opposite quadrants of the plot. Second, we see that similar variables are plotted close to each other (for instance not breakfast and not tea time). Third, the variable categories that are well categorized by the dimensions occur further from the center of the plot than others.We can clearly see that especially dinner and lunch seem to determine to be well distinguished. We can also confirm this by looking at the bar plots of the variables: it is clear that there seems to be a relatively small group of lunch or dinner drinkers.
 
 ```{r,warning=F,message=F}
 
@@ -100,11 +117,13 @@ gather(tea[,1:6]) %>%
   facet_wrap("key",scales="free") + 
   geom_bar()
 
-tea_plc_time_w_d <-
-  tea[,1:3]
-
-mca <- MCA(tea_plc_time_w_d,graph=F)
-summary(mca)
-plot(mca)
-
 ```
+
+Let's continue the analysis by adding the individuals to the plot:
+
+```{r, warning=F, message=F}
+plot(mca,habillage="quali")
+```
+
+Now, we have plotted in the upper left corner the individuals whose tea drinking habits are characterized by drinking tea during lunch and evenings. In th upper right corner we have those individuals who apparently do not drink tea at all (see also the above plot to better see the categories). The lower right corner represents tea drinkers that limit their consumption to dinner time. Finally, the lower left corner includes individuals that want to preserve their good night's sleep and only drink tea in the mornings and during tea time. The edgiest group seem to be those drinking with dinner as they do not tolerate drinking tea at any other time (Given that the interpretation is correct. May as well be not).
+
