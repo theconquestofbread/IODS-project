@@ -58,6 +58,8 @@ rats %>%
   
 
 ```
+
+
 In the plot above, I have plotted all the individual trajectories of rat growth in time. An onbvious observation is that in Group 1, the rats are smaller than in other groups. In Group 2, there seems to be a giant rat among the others, which are more similar to Group 3. The rats are bigger in the end of follow-up, and the growth seems to be relatively steady for most of them.In general, the rats with high start weight are the biggest in the end of the follow-up, which is also known as "the tracking phenomenon". This phenomenon is somewhat more visible below, where I have standardized the weight of rats at each time point:
 
 ```{r}
@@ -315,7 +317,7 @@ bprs %>%
 
 ```
 
-Well, these are not useful at al so I'll just move on to regression models.I will first start by violating the observations of the ordinary least squares linear regression model and fitting it to data with obviously not independent observations. I am interested whether time and the treatment received has an impact to the BPRS score (whether mental well-being improves or not). The model summary indicate that time decreases the BPRS score, which I believe indicate improvements in mwntal well-being. The treatment received seems notto have a statistically significant association with BPRS score 
+Well, these are not useful at all so I'll just move on to regression models.I will first start by violating the observations of the ordinary least squares linear regression model and fitting it to data with obviously not independent observations. I am interested whether time and the treatment received has an impact to the BPRS score (whether mental well-being improves or not). The model summary indicate that time decreases the BPRS score, which I believe indicate improvements in mwntal well-being. The treatment received seems notto have a statistically significant association with BPRS score 
 
 ```{r}
 #standard OLS model
